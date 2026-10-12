@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+using AutoMapper;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using WebApi.MinimalApi.Domain;
@@ -88,6 +89,44 @@ public class UsersController : Controller
                 nameof(GetUserById),
                 new { userId = userEntity.Id },
                 userEntity.Id);
+
+        return NoContent();
+    }
+
+    [HttpPatch("{userId}")]
+    [Produces("application/json", "application/xml")]
+    public IActionResult PartiallyUpdateUser(
+        [FromRoute] Guid userId,
+        [FromBody] JsonPatchDocument<PutUserDto>? patchDoc)
+    {
+        if (patchDoc == null)
+            return BadRequest();
+
+        var userEntity = userRepository.FindById(userId);
+        if (userEntity == null)
+            return NotFound();
+
+        var putUserDto = mapper.Map<PutUserDto>(userEntity);
+        patchDoc.ApplyTo(putUserDto, ModelState);
+        TryValidateModel(putUserDto);
+
+        if (!ModelState.IsValid)
+            return UnprocessableEntity(ModelState);
+
+        mapper.Map(putUserDto, userEntity);
+        userRepository.Update(userEntity);
+
+        return NoContent();
+    }
+
+    [HttpDelete("{userId}")]
+    public IActionResult DeleteUser([FromRoute] Guid userId)
+    {
+        var userEntity = userRepository.FindById(userId);
+        if (userEntity == null)
+            return NotFound();
+
+        userRepository.Delete(userId);
 
         return NoContent();
     }
